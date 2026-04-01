@@ -86,6 +86,9 @@ export default function App() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedUpgrade, setSelectedUpgrade] = useState<Upgrade | null>(null);
   const [copied, setCopied] = useState(false);
+  const [coins, setCoins] = useState(0);
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [adTimer, setAdTimer] = useState(0);
 
   const hashMultiplier = 1 + UPGRADES
     .filter(u => purchasedUpgrades.includes(u.id))
@@ -224,6 +227,41 @@ export default function App() {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const watchAd = () => {
+    setIsWatchingAd(true);
+    setAdTimer(5);
+    addLog('Loading high-reward advertisement...', 'info');
+    
+    const interval = setInterval(() => {
+      setAdTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setIsWatchingAd(false);
+          setCoins(c => c + 10);
+          addLog('Ad completed. 10 Coins added to your rewards balance.', 'success');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const doTask = () => {
+    addLog('Redirecting to external task portal...', 'info');
+    window.open("https://your-offer-link.com", "_blank");
+    setCoins(c => c + 50);
+    addLog('Task initiated. 50 Coins pending verification.', 'success');
+  };
+
+  const withdrawCoins = () => {
+    if (coins < 1000) {
+      addLog('Withdrawal failed: Minimum threshold is 1000 Coins.', 'error');
+      return;
+    }
+    addLog('Coin withdrawal request submitted to processing queue.', 'success');
+    setCoins(0);
   };
 
   return (
@@ -582,6 +620,72 @@ export default function App() {
             </div>
           </div>
 
+          {/* Daily Rewards Center */}
+          <section className="bg-[#151518] border border-white/5 rounded-2xl p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-yellow-500" />
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-white/70">Daily Rewards Center</h2>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <Coins className="w-3.5 h-3.5 text-yellow-500" />
+                <span className="text-xs font-bold text-yellow-500">{coins.toFixed(2)} Coins</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button 
+                onClick={watchAd}
+                disabled={isWatchingAd}
+                className="group relative bg-black/40 border border-white/5 rounded-xl p-4 hover:border-green-500/30 transition-all text-left overflow-hidden"
+              >
+                {isWatchingAd && (
+                  <motion.div 
+                    className="absolute bottom-0 left-0 h-1 bg-green-500"
+                    initial={{ width: '100%' }}
+                    animate={{ width: '0%' }}
+                    transition={{ duration: 5, ease: 'linear' }}
+                  />
+                )}
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-500">
+                    <Play className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Watch Ad</span>
+                </div>
+                <p className="text-xs font-bold mb-1">{isWatchingAd ? `Watching... (${adTimer}s)` : 'Earn 10 Coins'}</p>
+                <p className="text-[9px] text-white/20">Instant reward after 5s</p>
+              </button>
+
+              <button 
+                onClick={doTask}
+                className="group bg-black/40 border border-white/5 rounded-xl p-4 hover:border-blue-500/30 transition-all text-left"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <Rocket className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Complete Task</span>
+                </div>
+                <p className="text-xs font-bold mb-1">Earn 50 Coins</p>
+                <p className="text-[9px] text-white/20">High-yield external offers</p>
+              </button>
+
+              <button 
+                onClick={withdrawCoins}
+                className="group bg-black/40 border border-white/5 rounded-xl p-4 hover:border-yellow-500/30 transition-all text-left"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                    <RefreshCw className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Withdraw</span>
+                </div>
+                <p className="text-xs font-bold mb-1">Min: 1000 Coins</p>
+                <p className="text-[9px] text-white/20">Convert to XMR/SOL</p>
+              </button>
+            </div>
+          </section>
         </div>
       </main>
 
