@@ -23,7 +23,14 @@ import {
   Server,
   Rocket,
   Copy,
-  Check
+  Check,
+  User,
+  Trophy,
+  Link as LinkIcon,
+  Gift,
+  Dices,
+  ExternalLink,
+  Star
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -89,6 +96,32 @@ export default function App() {
   const [coins, setCoins] = useState(0);
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [adTimer, setAdTimer] = useState(0);
+  const [userName, setUserName] = useState(() => localStorage.getItem('mining_user') || 'Guest');
+  const [level, setLevel] = useState(() => parseInt(localStorage.getItem('mining_level') || '1'));
+  const [lastDaily, setLastDaily] = useState(() => parseInt(localStorage.getItem('mining_last_daily') || '0'));
+  const [showSpinResult, setShowSpinResult] = useState<{show: boolean, amount: number}>({show: false, amount: 0});
+
+  // Sync state to localStorage
+  useEffect(() => {
+    localStorage.setItem('mining_user', userName);
+    localStorage.setItem('mining_level', level.toString());
+    localStorage.setItem('mining_last_daily', lastDaily.toString());
+    localStorage.setItem('mining_coins', coins.toString());
+  }, [userName, level, lastDaily, coins]);
+
+  // Initial prompt for name if Guest
+  useEffect(() => {
+    if (userName === 'Guest') {
+      const name = prompt('Welcome! Please enter your username:');
+      if (name) setUserName(name);
+    }
+    
+    // Delayed notification
+    const timer = setTimeout(() => {
+      addLog('System: A new daily bonus is available in the Rewards Center!', 'info');
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const hashMultiplier = 1 + UPGRADES
     .filter(u => purchasedUpgrades.includes(u.id))
@@ -229,6 +262,21 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const earnCoins = (amount: number) => {
+    const bonus = 1 + (level * 0.1);
+    const totalEarned = amount * bonus;
+    setCoins(prev => {
+      const newTotal = prev + totalEarned;
+      // Level up check
+      if (newTotal > level * 500) {
+        setLevel(l => l + 1);
+        addLog(`Level Up! You reached Level ${level + 1}. Earnings bonus increased.`, 'success');
+      }
+      return newTotal;
+    });
+    return totalEarned;
+  };
+
   const watchAd = () => {
     setIsWatchingAd(true);
     setAdTimer(5);
@@ -239,8 +287,8 @@ export default function App() {
         if (prev <= 1) {
           clearInterval(interval);
           setIsWatchingAd(false);
-          setCoins(c => c + 10);
-          addLog('Ad completed. 10 Coins added to your rewards balance.', 'success');
+          const earned = earnCoins(10);
+          addLog(`Ad completed. ${earned.toFixed(2)} Coins added (Level Bonus applied).`, 'success');
           return 0;
         }
         return prev - 1;
@@ -250,9 +298,42 @@ export default function App() {
 
   const doTask = () => {
     addLog('Redirecting to external task portal...', 'info');
-    window.open("https://your-offer-link.com", "_blank");
-    setCoins(c => c + 50);
-    addLog('Task initiated. 50 Coins pending verification.', 'success');
+    window.open("https://www.cpagrip.com/show.php?l=0&u=YOUR_ID&id=YOUR_OFFER", "_blank");
+    const earned = earnCoins(50);
+    addLog(`Task initiated. ${earned.toFixed(2)} Coins pending verification.`, 'success');
+  };
+
+  const doShortlink = () => {
+    addLog('Opening shortlink verification...', 'info');
+    window.open("https://your-shortlink.com", "_blank");
+    const earned = earnCoins(5);
+    addLog(`Shortlink accessed. ${earned.toFixed(2)} Coins added.`, 'success');
+  };
+
+  const claimDaily = () => {
+    const now = Date.now();
+    if (now - lastDaily < 86400000) {
+      const hoursLeft = Math.ceil((86400000 - (now - lastDaily)) / 3600000);
+      addLog(`Daily reward not ready. Please return in ${hoursLeft} hours.`, 'warning');
+      return;
+    }
+    setLastDaily(now);
+    const earned = earnCoins(30);
+    addLog(`Daily bonus claimed! ${earned.toFixed(2)} Coins added.`, 'success');
+  };
+
+  const spinWheel = () => {
+    const reward = Math.floor(Math.random() * 100);
+    const earned = earnCoins(reward);
+    setShowSpinResult({show: true, amount: earned});
+    addLog(`Lucky Spin: You won ${earned.toFixed(2)} Coins!`, 'success');
+    setTimeout(() => setShowSpinResult({show: false, amount: 0}), 3000);
+  };
+
+  const copyRef = () => {
+    const refLink = `${window.location.origin}${window.location.pathname}?ref=${userName}`;
+    copyToClipboard(refLink);
+    addLog('Referral link copied to clipboard!', 'info');
   };
 
   const withdrawCoins = () => {
@@ -621,23 +702,43 @@ export default function App() {
           </div>
 
           {/* Daily Rewards Center */}
-          <section className="bg-[#151518] border border-white/5 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-yellow-500" />
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-white/70">Daily Rewards Center</h2>
+          <section className="bg-[#151518] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
+                  <User className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">{userName}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 font-bold uppercase">Level {level}</span>
+                    <span className="text-[10px] text-white/20 font-medium">Bonus: +{(level * 10)}%</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                <Coins className="w-3.5 h-3.5 text-yellow-500" />
-                <span className="text-xs font-bold text-yellow-500">{coins.toFixed(2)} Coins</span>
+
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Rewards Balance</span>
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-yellow-500" />
+                    <span className="text-lg font-black text-yellow-500">{coins.toFixed(2)}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={withdrawCoins}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                >
+                  Withdraw
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <button 
                 onClick={watchAd}
                 disabled={isWatchingAd}
-                className="group relative bg-black/40 border border-white/5 rounded-xl p-4 hover:border-green-500/30 transition-all text-left overflow-hidden"
+                className="group relative bg-black/40 border border-white/5 rounded-xl p-3 hover:border-green-500/30 transition-all text-left overflow-hidden"
               >
                 {isWatchingAd && (
                   <motion.div 
@@ -647,43 +748,80 @@ export default function App() {
                     transition={{ duration: 5, ease: 'linear' }}
                   />
                 )}
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-500">
-                    <Play className="w-4 h-4" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Watch Ad</span>
-                </div>
-                <p className="text-xs font-bold mb-1">{isWatchingAd ? `Watching... (${adTimer}s)` : 'Earn 10 Coins'}</p>
-                <p className="text-[9px] text-white/20">Instant reward after 5s</p>
+                <Play className="w-4 h-4 text-green-500 mb-2" />
+                <p className="text-[10px] font-bold mb-0.5">{isWatchingAd ? `Watching...` : 'Watch Ad'}</p>
+                <p className="text-[9px] text-white/20">+10 Coins</p>
               </button>
 
               <button 
                 onClick={doTask}
-                className="group bg-black/40 border border-white/5 rounded-xl p-4 hover:border-blue-500/30 transition-all text-left"
+                className="group bg-black/40 border border-white/5 rounded-xl p-3 hover:border-blue-500/30 transition-all text-left"
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
-                    <Rocket className="w-4 h-4" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Complete Task</span>
-                </div>
-                <p className="text-xs font-bold mb-1">Earn 50 Coins</p>
-                <p className="text-[9px] text-white/20">High-yield external offers</p>
+                <Rocket className="w-4 h-4 text-blue-500 mb-2" />
+                <p className="text-[10px] font-bold mb-0.5">Task</p>
+                <p className="text-[9px] text-white/20">+50 Coins</p>
               </button>
 
               <button 
-                onClick={withdrawCoins}
-                className="group bg-black/40 border border-white/5 rounded-xl p-4 hover:border-yellow-500/30 transition-all text-left"
+                onClick={doShortlink}
+                className="group bg-black/40 border border-white/5 rounded-xl p-3 hover:border-purple-500/30 transition-all text-left"
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-                    <RefreshCw className="w-4 h-4" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Withdraw</span>
-                </div>
-                <p className="text-xs font-bold mb-1">Min: 1000 Coins</p>
-                <p className="text-[9px] text-white/20">Convert to XMR/SOL</p>
+                <ExternalLink className="w-4 h-4 text-purple-500 mb-2" />
+                <p className="text-[10px] font-bold mb-0.5">Shortlink</p>
+                <p className="text-[9px] text-white/20">+5 Coins</p>
               </button>
+
+              <button 
+                onClick={claimDaily}
+                className="group bg-black/40 border border-white/5 rounded-xl p-3 hover:border-yellow-500/30 transition-all text-left"
+              >
+                <Gift className="w-4 h-4 text-yellow-500 mb-2" />
+                <p className="text-[10px] font-bold mb-0.5">Daily Bonus</p>
+                <p className="text-[9px] text-white/20">+30 Coins</p>
+              </button>
+
+              <button 
+                onClick={spinWheel}
+                className="group relative bg-black/40 border border-white/5 rounded-xl p-3 hover:border-red-500/30 transition-all text-left overflow-hidden"
+              >
+                <AnimatePresence>
+                  {showSpinResult.show && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-red-500 flex items-center justify-center z-10"
+                    >
+                      <span className="text-xs font-black text-white">+{showSpinResult.amount.toFixed(0)}!</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <Dices className="w-4 h-4 text-red-500 mb-2" />
+                <p className="text-[10px] font-bold mb-0.5">Lucky Spin</p>
+                <p className="text-[9px] text-white/20">Random Reward</p>
+              </button>
+            </div>
+
+            <div className="bg-black/40 border border-white/5 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <LinkIcon className="w-3.5 h-3.5 text-white/40" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Referral Program</span>
+              </div>
+              <div className="flex gap-2">
+                <input 
+                  readOnly
+                  value={`${window.location.origin}${window.location.pathname}?ref=${userName}`}
+                  className="flex-1 bg-black/60 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-white/60 font-mono focus:outline-none"
+                />
+                <button 
+                  onClick={copyRef}
+                  className="px-4 py-2 bg-orange-500 text-black rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-orange-400 transition-all flex items-center gap-2"
+                >
+                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <p className="mt-2 text-[9px] text-white/20 italic">Share your link to earn 10% of your friends' earnings.</p>
             </div>
           </section>
         </div>
