@@ -165,6 +165,29 @@ export default function App() {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'processing' | 'success'>('idle');
+
+  const handleWithdraw = () => {
+    if (earnings < 0.1) {
+      addLog('Withdrawal failed: Minimum payout threshold (0.1 XMR) not reached.', 'error');
+      return;
+    }
+    setShowWithdrawModal(true);
+  };
+
+  const processWithdrawal = async () => {
+    setWithdrawStatus('processing');
+    addLog('Initiating secure withdrawal protocol...', 'info');
+    
+    // Simulate network delay
+    setTimeout(() => {
+      setWithdrawStatus('success');
+      addLog(`Withdrawal of ${earnings.toFixed(8)} XMR successful. Transaction Hash: 0x${Math.random().toString(16).slice(2, 18)}...`, 'success');
+      setEarnings(0);
+    }, 3000);
+  };
+
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-[#E4E4E7] font-sans selection:bg-orange-500/30">
       {/* Header */}
@@ -199,10 +222,8 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Column: Controls & Stats */}
+        {/* Left Column */}
         <div className="lg:col-span-4 space-y-6">
-          
           {/* Wallet Input */}
           <section className="bg-[#151518] border border-white/5 rounded-2xl p-6 shadow-xl">
             <div className="flex items-center gap-2 mb-4">
@@ -243,6 +264,50 @@ export default function App() {
                 )}
               </button>
             </div>
+          </section>
+          
+          {/* Withdrawal Section */}
+          <section className="bg-[#151518] border border-white/5 rounded-2xl p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-green-500" />
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-white/70">Payouts</h2>
+              </div>
+              <span className="text-[10px] font-bold text-white/30 uppercase">Min: 0.1 XMR</span>
+            </div>
+            
+            <div className="bg-black/40 rounded-xl p-4 border border-white/5 mb-4">
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Available Balance</p>
+                  <p className="text-xl font-bold text-white">{earnings.toFixed(8)} <span className="text-orange-500 text-xs">XMR</span></p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Progress</p>
+                  <p className="text-xs font-bold text-green-500">{Math.min((earnings / 0.1) * 100, 100).toFixed(1)}%</p>
+                </div>
+              </div>
+              <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-green-500"
+                  animate={{ width: `${Math.min((earnings / 0.1) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            <button 
+              onClick={handleWithdraw}
+              disabled={earnings < 0.1 || isMining}
+              className={cn(
+                "w-full py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all border",
+                earnings >= 0.1 && !isMining
+                  ? "bg-green-500 text-black border-green-400 hover:bg-green-400"
+                  : "bg-white/5 text-white/20 border-white/5 cursor-not-allowed"
+              )}
+            >
+              Withdraw Funds
+            </button>
+            {isMining && <p className="text-[9px] text-center mt-2 text-orange-500/60 italic">Stop mining to enable withdrawal</p>}
           </section>
 
           {/* Stats Grid */}
@@ -482,6 +547,67 @@ export default function App() {
           background: rgba(255, 255, 255, 0.2);
         }
       `}</style>
+
+      {/* Withdrawal Modal */}
+      <AnimatePresence>
+        {showWithdrawModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="bg-[#151518] border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center"
+            >
+              <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <RefreshCw className={cn("w-8 h-8 text-green-500", withdrawStatus === 'processing' && "animate-spin")} />
+              </div>
+              
+              <h2 className="text-2xl font-bold mb-2">
+                {withdrawStatus === 'idle' && "Confirm Withdrawal"}
+                {withdrawStatus === 'processing' && "Processing..."}
+                {withdrawStatus === 'success' && "Success!"}
+              </h2>
+              
+              <p className="text-sm text-white/50 mb-8">
+                {withdrawStatus === 'idle' && `You are about to withdraw ${earnings.toFixed(8)} XMR to your configured wallet address.`}
+                {withdrawStatus === 'processing' && "Verifying transaction on the Monero blockchain. Please wait..."}
+                {withdrawStatus === 'success' && "Funds have been dispatched. Check your wallet in a few minutes."}
+              </p>
+
+              <div className="space-y-3">
+                {withdrawStatus === 'idle' && (
+                  <>
+                    <button 
+                      onClick={processWithdrawal}
+                      className="w-full py-4 bg-green-500 text-black rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-green-400 transition-all"
+                    >
+                      Confirm & Send
+                    </button>
+                    <button 
+                      onClick={() => setShowWithdrawModal(false)}
+                      className="w-full py-4 bg-white/5 text-white/60 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-white/10 transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+                {withdrawStatus === 'success' && (
+                  <button 
+                    onClick={() => {
+                      setShowWithdrawModal(false);
+                      setWithdrawStatus('idle');
+                    }}
+                    className="w-full py-4 bg-white text-black rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-white/90 transition-all"
+                  >
+                    Back to Dashboard
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Mining Report Modal */}
       <AnimatePresence>
         {showReport && (
